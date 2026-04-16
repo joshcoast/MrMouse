@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MenuView: View {
-    @EnvironmentObject var jiggler: JigglerManager
+    @EnvironmentObject var mouse: MouseManager
 
     var body: some View {
         // Status row
@@ -10,22 +10,36 @@ struct MenuView: View {
         Divider()
 
         // Toggle
-        Button(jiggler.isRunning ? "Stop Jiggling" : "Start Jiggling") {
-            jiggler.toggle()
+        Button(mouse.isRunning ? "Stop MrMouse" : "Start MrMouse") {
+            mouse.toggle()
         }
         .keyboardShortcut("j", modifiers: [])
 
         Divider()
 
+        // Wild mode toggle
+        Button {
+            mouse.toggleWildMode()
+        } label: {
+            HStack {
+                Text("Wild Wiggle")
+                if mouse.wildMode {
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+
+        Divider()
+
         // Interval submenu
-        Menu("Interval: \(jiggler.selectedInterval.label)") {
-            ForEach(jiggler.intervals) { option in
+        Menu("Interval: \(mouse.selectedInterval.label)") {
+            ForEach(mouse.intervals) { option in
                 Button {
-                    jiggler.setInterval(option)
+                    mouse.setInterval(option)
                 } label: {
                     HStack {
                         Text(option.label)
-                        if jiggler.selectedInterval == option {
+                        if mouse.selectedInterval == option {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -35,7 +49,7 @@ struct MenuView: View {
 
         Divider()
 
-        Button("Quit Mouse Jiggler") {
+        Button("Quit MrMouse") {
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q", modifiers: [])
@@ -47,12 +61,14 @@ struct MenuView: View {
     private var statusRow: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(jiggler.isRunning ? Color.green : Color.secondary.opacity(0.4))
+                .fill(mouse.isRunning ? Color.green : Color.secondary.opacity(0.4))
                 .frame(width: 8, height: 8)
                 .padding(.leading, 2)
 
-            if jiggler.isRunning {
-                Text("Jiggling every \(jiggler.selectedInterval.label)")
+            if mouse.isRunning {
+                Text(mouse.wildMode
+                     ? "Wiggling wildly every \(mouse.selectedInterval.label)"
+                     : "Moving every \(mouse.selectedInterval.label)")
                     .font(.callout)
             } else {
                 Text("Inactive — mouse is resting")

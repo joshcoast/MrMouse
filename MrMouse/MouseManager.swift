@@ -3,30 +3,31 @@ import CoreGraphics
 import IOKit.pwr_mgt
 import Combine
 
-/// Interval options for the jiggle timer.
-struct JiggleInterval: Identifiable, Equatable {
+/// Interval options for the move timer.
+struct MoveInterval: Identifiable, Equatable {
     let id = UUID()
     let label: String
     let seconds: TimeInterval
 }
 
 /// Observable controller that owns the timer and drives mouse movement.
-final class JigglerManager: ObservableObject {
+final class MouseManager: ObservableObject {
 
     // MARK: - Published state
 
     @Published private(set) var isRunning = false
-    @Published var selectedInterval: JiggleInterval
+    @Published var selectedInterval: MoveInterval
+    @Published var wildMode: Bool = false
 
     // MARK: - Constants
 
-    let intervals: [JiggleInterval] = [
-        JiggleInterval(label: "15 seconds", seconds: 15),
-        JiggleInterval(label: "30 seconds", seconds: 30),
-        JiggleInterval(label: "1 minute",   seconds: 60),
-        JiggleInterval(label: "2 minutes",  seconds: 120),
-        JiggleInterval(label: "5 minutes",  seconds: 300),
-        JiggleInterval(label: "10 minutes", seconds: 600),
+    let intervals: [MoveInterval] = [
+        MoveInterval(label: "15 seconds", seconds: 15),
+        MoveInterval(label: "30 seconds", seconds: 30),
+        MoveInterval(label: "1 minute",   seconds: 60),
+        MoveInterval(label: "2 minutes",  seconds: 120),
+        MoveInterval(label: "5 minutes",  seconds: 300),
+        MoveInterval(label: "10 minutes", seconds: 600),
     ]
 
     // MARK: - Private
@@ -36,6 +37,7 @@ final class JigglerManager: ObservableObject {
     private var sleepAssertion: IOPMAssertionID = 0
 
     private static let defaultIntervalKey = "selectedIntervalSeconds"
+    private static let wildModeKey = "wildMode"
 
     // MARK: - Init / deinit
 
@@ -43,14 +45,15 @@ final class JigglerManager: ObservableObject {
         // Restore persisted interval (default: 1 minute).
         let saved = UserDefaults.standard.double(forKey: Self.defaultIntervalKey)
         let match = [
-            JiggleInterval(label: "15 seconds", seconds: 15),
-            JiggleInterval(label: "30 seconds", seconds: 30),
-            JiggleInterval(label: "1 minute",   seconds: 60),
-            JiggleInterval(label: "2 minutes",  seconds: 120),
-            JiggleInterval(label: "5 minutes",  seconds: 300),
-            JiggleInterval(label: "10 minutes", seconds: 600),
+            MoveInterval(label: "15 seconds", seconds: 15),
+            MoveInterval(label: "30 seconds", seconds: 30),
+            MoveInterval(label: "1 minute",   seconds: 60),
+            MoveInterval(label: "2 minutes",  seconds: 120),
+            MoveInterval(label: "5 minutes",  seconds: 300),
+            MoveInterval(label: "10 minutes", seconds: 600),
         ].first { $0.seconds == saved }
-        selectedInterval = match ?? JiggleInterval(label: "1 minute", seconds: 60)
+        selectedInterval = match ?? MoveInterval(label: "1 minute", seconds: 60)
+        wildMode = UserDefaults.standard.bool(forKey: Self.wildModeKey)
     }
 
     deinit {
@@ -63,12 +66,17 @@ final class JigglerManager: ObservableObject {
         isRunning ? stop() : start()
     }
 
-    func setInterval(_ interval: JiggleInterval) {
+    func setInterval(_ interval: MoveInterval) {
         selectedInterval = interval
         UserDefaults.standard.set(interval.seconds, forKey: Self.defaultIntervalKey)
         if isRunning {
             restartTimer()
         }
+    }
+
+    func toggleWildMode() {
+        wildMode.toggle()
+        UserDefaults.standard.set(wildMode, forKey: Self.wildModeKey)
     }
 
     // MARK: - Private helpers
@@ -104,6 +112,10 @@ final class JigglerManager: ObservableObject {
     // MARK: - Mouse movement
 
     private func jiggle() {
+        wildMode ? wildJiggle() : normalJiggle()
+    }
+
+    private func normalJiggle() {
         guard let event = CGEvent(source: nil) else { return }
         let origin = event.location
 
@@ -120,10 +132,37 @@ final class JigglerManager: ObservableObject {
         direction *= -1
     }
 
+    /// Mimics a person randomly shaking their mouse with a burst of erratic moves.
+    private func wildJiggle() {
+        guard let event = CGEvent(source: nil) else { return }
+        let origin = event.location
+
+        let moveCount = Int.random(in: 8...14)
+        var elapsed = 0.0
+
+        for _ in 0..<moveCount {
+            let delay = elapsed + Double.random(in: 0.03...0.07)
+            elapsed = delay
+            let dx = CGFloat.random(in: -45...45)
+            let dy = CGFloat.random(in: -45...45)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard self != nil else { return }
+                CGWarpMouseCursorPosition(CGPoint(x: origin.x + dx, y: origin.y + dy))
+                CGAssociateMouseAndMouseCursorPosition(1)
+            }
+        }
+
+        // Snap back to origin after the burst.
+        DispatchQueue.main.asyncAfter(deadline: .now() + elapsed + 0.05) {
+            CGWarpMouseCursorPosition(origin)
+            CGAssociateMouseAndMouseCursorPosition(1)
+        }
+    }
+
     // MARK: - Power management
 
     private func acquireSleepAssertion() {
-        let reason = "Mouse Jiggler is keeping the display awake" as CFString
+        let reason = "MrMouse is keeping the display awake" as CFString
         IOPMAssertionCreateWithName(
             kIOPMAssertionTypeNoDisplaySleep as CFString,
             IOPMAssertionLevel(kIOPMAssertionLevelOn),

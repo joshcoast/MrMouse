@@ -22,7 +22,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         if isRunning {
-            if #available(macOS 14.0, *) {
+            if #available(macOS 15.0, *) {
                 if isWild {
                     Image(systemName: "computermouse.fill")
                         .symbolEffect(.bounce.byLayer, options: .repeating)
@@ -30,6 +30,9 @@ struct MenuBarLabel: View {
                     Image(systemName: "computermouse.fill")
                         .symbolEffect(.pulse)
                 }
+            } else if #available(macOS 14.0, *) {
+                Image(systemName: "computermouse.fill")
+                    .symbolEffect(.pulse)
             } else {
                 Image(systemName: "computermouse.fill")
             }

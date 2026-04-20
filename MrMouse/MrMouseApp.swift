@@ -25,7 +25,7 @@ struct MenuBarLabel: View {
             if #available(macOS 15.0, *) {
                 if isWild {
                     Image(systemName: "computermouse.fill")
-                        .symbolEffect(.bounce.byLayer, options: .repeating)
+                        .symbolEffect(.wiggle, options: .repeating)
                 } else {
                     Image(systemName: "computermouse.fill")
                         .symbolEffect(.pulse)

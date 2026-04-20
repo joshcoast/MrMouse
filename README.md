@@ -6,6 +6,29 @@ your computer awake — a clean Swift/SwiftUI rewrite of the classic
 
 ---
 
+## Install
+
+Grab the latest `MrMouse-X.Y.Z.dmg` from the
+[Releases page](../../releases/latest).
+
+1. Open the DMG and drag **MrMouse** into **Applications**.
+2. **First launch only:** right-click (or ⌃-click) MrMouse in Applications,
+   choose **Open**, then confirm **Open** in the dialog.
+3. After that, it launches normally from Spotlight or the menu bar.
+
+> **Why the right-click dance?** MrMouse is not signed with an Apple Developer
+> ID, so Gatekeeper blocks it the first time. The right-click override is
+> macOS's built-in "I trust this one" escape hatch. You only do it once.
+
+If macOS claims the app is "damaged," it's just aggressive quarantine — run
+this once in Terminal and try again:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/MrMouse.app
+```
+
+---
+
 ## Features
 
 | Feature | Details |
@@ -14,6 +37,7 @@ your computer awake — a clean Swift/SwiftUI rewrite of the classic
 | **Live status** | Icon pulses while active; bounces when Wild Wiggle is on |
 | **Configurable interval** | 15 s · 30 s · 1 min · 2 min · 5 min · 10 min |
 | **Wild Wiggle mode** | Mimics erratic human movement — 8–14 random ±45 px bursts per tick |
+| **Only when idle** | Optional: wait until you've been inactive for 1–15 min before jiggling; pause the moment you come back |
 | **Dual sleep prevention** | Moves the cursor **and** holds an `IOPMAssertion` (no display sleep) |
 | **Persisted preferences** | Last-used interval and Wild Wiggle state survive restarts via `UserDefaults` |
 | **Zero permissions needed** | Uses `CGWarpMouseCursorPosition` — no Accessibility access required |
@@ -114,6 +138,34 @@ MrMouse/
 ├── generate_icons.sh           — SVG → PNG converter
 └── README.md
 ```
+
+---
+
+## Releasing
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`) whenever
+a `v*` tag is pushed. Artifact is an unsigned, ad-hoc-signed DMG — no Apple
+Developer account required.
+
+```bash
+# 1. Bump MARKETING_VERSION in Xcode (Target → General → Version) and commit.
+# 2. Tag and push:
+git tag v1.2.3
+git push origin v1.2.3
+# 3. Watch the Actions tab. A draft-free GitHub Release appears with the DMG.
+```
+
+To build a DMG locally (e.g. to smoke-test before tagging):
+
+```bash
+brew install create-dmg      # one-time
+./scripts/build-dmg.sh       # → dist/MrMouse-<version>.dmg
+# Or override the version:
+VERSION=1.2.3-rc1 ./scripts/build-dmg.sh
+```
+
+If you later decide to upgrade to the polished path (Developer ID + notarization),
+the CI job is the right place to bolt that on — the local script stays the same.
 
 ---
 

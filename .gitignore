@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Xcode build output
+build/
+DerivedData/
+*.xcarchive
+
+# Release artifacts
+dist/
+
+# Xcode user-specific state (keep xcshareddata, ignore xcuserdata)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Signing secrets (not used by the scrappy path, but don't ever commit these)
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile

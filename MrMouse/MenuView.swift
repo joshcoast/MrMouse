@@ -10,8 +10,13 @@ struct MenuView: View {
         Divider()
 
         // Toggle
-        Button(mouse.isRunning ? "Stop MrMouse" : "Start MrMouse") {
+        Button {
             mouse.toggle()
+        } label: {
+            HStack {
+                Image(systemName: mouse.isRunning ? "stop.fill" : "play.fill")
+                Text(mouse.isRunning ? "Stop MrMouse" : "Start MrMouse")
+            }
         }
         .keyboardShortcut("j", modifiers: [])
 
@@ -24,6 +29,18 @@ struct MenuView: View {
             HStack {
                 Text("Wild Wiggle")
                 if mouse.wildMode {
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+
+        // Only-when-idle toggle
+        Button {
+            mouse.toggleIdleOnly()
+        } label: {
+            HStack {
+                Text("Only when idle")
+                if mouse.idleOnly {
                     Image(systemName: "checkmark")
                 }
             }
@@ -47,6 +64,24 @@ struct MenuView: View {
             }
         }
 
+        // Idle-threshold submenu — only relevant when idle-gating is on.
+        if mouse.idleOnly {
+            Menu("Start after: \(mouse.idleThreshold.label)") {
+                ForEach(mouse.idleThresholds) { option in
+                    Button {
+                        mouse.setIdleThreshold(option)
+                    } label: {
+                        HStack {
+                            Text(option.label)
+                            if mouse.idleThreshold == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Divider()
 
         Button("Quit MrMouse") {
@@ -60,22 +95,30 @@ struct MenuView: View {
     @ViewBuilder
     private var statusRow: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(mouse.isRunning ? Color.green : Color.secondary.opacity(0.4))
-                .frame(width: 8, height: 8)
-                .padding(.leading, 2)
-
-            if mouse.isRunning {
-                Text(mouse.wildMode
-                     ? "Wiggling wildly every \(mouse.selectedInterval.label)"
-                     : "Moving every \(mouse.selectedInterval.label)")
-                    .font(.callout)
-            } else {
-                Text("Inactive — mouse is resting")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            // Native NSMenu strips custom SwiftUI shapes, so we use an
+            // SF Symbol. Color is also stripped, so we vary the *glyph*
+            // across the three states instead.
+            Image(systemName: statusSymbol)
+            Text(statusText)
         }
-        .padding(.vertical, 2)
+    }
+
+    /// `circle` (hollow) = off, `circle.dashed` = waiting, `circle.fill` = jiggling.
+    private var statusSymbol: String {
+        if !mouse.isRunning { return "circle" }
+        if mouse.isWaiting  { return "circle.dashed" }
+        return "circle.fill"
+    }
+
+    private var statusText: String {
+        if !mouse.isRunning {
+            return "Inactive — mouse is resting"
+        }
+        if mouse.isWaiting {
+            return "Waiting — starts after \(mouse.idleThreshold.label) of idle"
+        }
+        return mouse.wildMode
+            ? "Wiggling wildly every \(mouse.selectedInterval.label)"
+            : "Moving every \(mouse.selectedInterval.label)"
     }
 }

@@ -4,14 +4,14 @@ import IOKit.pwr_mgt
 import Combine
 
 /// Interval options for the move timer.
-struct MoveInterval: Identifiable, Equatable {
+struct MoveInterval: Identifiable, Equatable, Hashable {
     let id = UUID()
     let label: String
     let seconds: TimeInterval
 }
 
 /// How long the user must be idle before jiggling begins (when idle-gating is on).
-struct IdleThreshold: Identifiable, Equatable {
+struct IdleThreshold: Identifiable, Equatable, Hashable {
     let id = UUID()
     let label: String
     let seconds: TimeInterval
@@ -23,6 +23,7 @@ final class MouseManager: ObservableObject {
     // MARK: - Published state
 
     @Published private(set) var isRunning = false
+    @Published private(set) var jigglesThisSession: Int = 0
     /// True when `isRunning && idleOnly` and we haven't yet seen enough
     /// idle time to start jiggling. Drives the "Waiting for idle…" label.
     @Published private(set) var isWaiting = false
@@ -254,6 +255,7 @@ final class MouseManager: ObservableObject {
     // MARK: - Mouse movement
 
     private func jiggle() {
+        jigglesThisSession += 1
         wildMode ? wildJiggle() : normalJiggle()
     }
 

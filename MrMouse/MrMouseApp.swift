@@ -11,7 +11,7 @@ struct MrMouseApp: App {
         } label: {
             MenuBarLabel(isRunning: mouse.isRunning, isWild: mouse.wildMode)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
     }
 }
 

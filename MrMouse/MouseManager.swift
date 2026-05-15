@@ -95,6 +95,9 @@ final class MouseManager: ObservableObject {
 
         wildMode = UserDefaults.standard.bool(forKey: Self.wildModeKey)
         idleOnly = UserDefaults.standard.bool(forKey: Self.idleOnlyKey)
+
+        // Start jiggling automatically on launch.
+        start()
     }
 
     deinit {

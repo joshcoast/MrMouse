@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 @main
@@ -15,26 +16,25 @@ struct MrMouseApp: App {
     }
 }
 
-/// Animates between a static and active icon in the menu bar.
+/// Shows the mouse in the menu bar: outline when stopped, filled when
+/// running, and wiggling side to side in wild mode.
 struct MenuBarLabel: View {
     let isRunning: Bool
     let isWild: Bool
 
+    @State private var tiltLeft = false
+    private let wiggle = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+
     var body: some View {
-        if isRunning {
-            if #available(macOS 14.0, *) {
-                if isWild {
-                    Image(systemName: "computermouse.fill")
-                        .symbolEffect(.variableColor.iterative, options: .repeating)
-                } else {
-                    Image(systemName: "computermouse.fill")
-                        .symbolEffect(.pulse)
-                }
-            } else {
-                Image(systemName: "computermouse.fill")
+        Image(imageName)
+            .onReceive(wiggle) { _ in
+                if isRunning && isWild { tiltLeft.toggle() }
             }
-        } else {
-            Image(systemName: "computermouse")
-        }
+    }
+
+    private var imageName: String {
+        guard isRunning else { return "MenuBarMouse" }
+        guard isWild else { return "MenuBarMouseFill" }
+        return tiltLeft ? "MenuBarMouseTiltLeft" : "MenuBarMouseTiltRight"
     }
 }

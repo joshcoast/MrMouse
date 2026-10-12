@@ -77,20 +77,15 @@ The finished `.app` lands in `build/Build/Products/Release/MrMouse.app`.
 
 ## Icon
 
-The source artwork is `icon.svg` — a computer mouse with vibrating arcs on a
-deep-violet gradient background.
+The app icon is `MrMouse/AppIcon.icon`, an Icon Composer file: a hand-drawn
+mouse head (`Assets/mouse.png`, white lines on transparent) over a solid
+`#242424` fill. Open it in Icon Composer (bundled with Xcode) to tweak it.
+Xcode compiles it into the app on build, including fallbacks for older macOS.
 
-Generate all required PNG sizes (needs `librsvg` or Inkscape):
+Using Icon Composer matters on macOS 26+: icons built from a plain
+`AppIcon.appiconset` get shrunk into a light gray frame by the system.
 
-```bash
-brew install librsvg   # one-time setup
-chmod +x generate_icons.sh
-./generate_icons.sh
-```
-
-The script writes the PNGs into
-`MrMouse/Assets.xcassets/AppIcon.appiconset/` and Xcode picks them up
-automatically on the next build.
+The menu bar icons are template SVGs in `Assets.xcassets/MenuBarMouse*`.
 
 ---
 
@@ -132,10 +127,8 @@ MrMouse/
 │   ├── MouseManager.swift  — ObservableObject: timer, cursor warp, IOPM, Wild Wiggle
 │   ├── MenuView.swift      — SwiftUI menu content
 │   ├── Info.plist          — LSUIElement = YES (no Dock icon)
-│   └── Assets.xcassets/
-│       └── AppIcon.appiconset/
-├── icon.svg                    — Source artwork (1024×1024)
-├── generate_icons.sh           — SVG → PNG converter
+│   ├── AppIcon.icon/       — Icon Composer app icon
+│   └── Assets.xcassets/    — Menu bar icons, accent color
 └── README.md
 ```
 

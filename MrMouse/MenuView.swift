@@ -7,6 +7,10 @@ struct MenuView: View {
         VStack(spacing: 0) {
             statusSection
             Divider()
+            if !mouse.hasAccessibility {
+                accessibilitySection
+                Divider()
+            }
             controlsSection
             Divider()
             intervalSection
@@ -14,6 +18,7 @@ struct MenuView: View {
             footerSection
         }
         .frame(width: 280)
+        .onAppear { mouse.refreshAccessibility() }
     }
 
     // MARK: - Sections
@@ -37,6 +42,25 @@ struct MenuView: View {
         .padding(.vertical, 12)
         .background(statusColor.opacity(0.07))
         .animation(.easeInOut(duration: 0.3), value: statusColor)
+    }
+
+    private var accessibilitySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Accessibility access needed", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.orange)
+            Text("Without it, Teams and other apps can't see MrMouse's movement and will still show you as away.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Open Accessibility Settings") {
+                mouse.openAccessibilitySettings()
+            }
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     private var controlsSection: some View {

@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import ApplicationServices
 import CoreGraphics
 import IOKit.pwr_mgt
 import Combine
@@ -31,6 +33,9 @@ final class MouseManager: ObservableObject {
     @Published var wildMode: Bool = false
     @Published var idleOnly: Bool = false
     @Published var idleThreshold: IdleThreshold
+    /// Whether macOS lets us post input events. Without it, jiggles are
+    /// silently dropped and apps like Teams still see the Mac as idle.
+    @Published private(set) var hasAccessibility = AXIsProcessTrusted()
 
     // MARK: - Constants
 
@@ -61,6 +66,11 @@ final class MouseManager: ObservableObject {
     private var timer: Timer?
     private var direction: CGFloat = 1
     private var sleepAssertion: IOPMAssertionID = 0
+    /// When we last posted a synthetic event, and how long the real user had
+    /// been idle at that moment. Lets `currentIdleSeconds()` see past our own
+    /// jiggles, which reset the system idle counter just like real input.
+    private var lastSyntheticEventAt: Date?
+    private var userIdleAtLastSyntheticEvent: TimeInterval = 0
 
     private static let defaultIntervalKey  = "selectedIntervalSeconds"
     private static let wildModeKey         = "wildMode"
@@ -143,8 +153,22 @@ final class MouseManager: ObservableObject {
 
     // MARK: - Private helpers
 
+    /// Opens the Accessibility pane in System Settings so the user can
+    /// allow MrMouse to post mouse events.
+    func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Re-reads the Accessibility permission, e.g. when the menu opens after
+    /// the user has granted it in System Settings.
+    func refreshAccessibility() {
+        hasAccessibility = AXIsProcessTrusted()
+    }
+
     private func start() {
         isRunning = true
+        requestAccessibilityIfNeeded()
         acquireSleepAssertion()
         scheduleForCurrentMode()
     }
@@ -243,10 +267,21 @@ final class MouseManager: ObservableObject {
         }
     }
 
-    /// System-wide seconds since the last real input (keyboard, mouse, etc.).
-    /// `CGWarpMouseCursorPosition` does not reset this counter, which is
-    /// exactly why MrMouse can use this to detect the real human's return.
+    /// Seconds since the last *real* input (keyboard, mouse, etc.).
+    /// Our posted mouse events reset the system idle counter too (that's
+    /// what keeps Teams green), so if nothing has happened since our last
+    /// jiggle we extend the user's idle time from that point instead.
     private func currentIdleSeconds() -> TimeInterval {
+        let systemIdle = systemIdleSeconds()
+        guard let lastSynthetic = lastSyntheticEventAt else { return systemIdle }
+        let sinceSynthetic = Date().timeIntervalSince(lastSynthetic)
+        // Input newer than our last jiggle means the human is back.
+        if systemIdle + 0.5 < sinceSynthetic { return systemIdle }
+        return userIdleAtLastSyntheticEvent + sinceSynthetic
+    }
+
+    /// System-wide seconds since the last input event, ours included.
+    private func systemIdleSeconds() -> TimeInterval {
         // `CGEventType(rawValue: ~0)` is the idiomatic "any event type" value.
         guard let anyEvent = CGEventType(rawValue: ~0) else { return 0 }
         return CGEventSource.secondsSinceLastEventType(
@@ -259,6 +294,7 @@ final class MouseManager: ObservableObject {
 
     private func jiggle() {
         jigglesThisSession += 1
+        refreshAccessibility()
         wildMode ? wildJiggle() : normalJiggle()
     }
 
@@ -267,13 +303,10 @@ final class MouseManager: ObservableObject {
         let origin = event.location
 
         // Nudge 1 px in alternating directions, then snap back.
-        let nudged = CGPoint(x: origin.x + direction, y: origin.y)
-        CGWarpMouseCursorPosition(nudged)
-        CGAssociateMouseAndMouseCursorPosition(1)
+        postMouseMove(to: CGPoint(x: origin.x + direction, y: origin.y))
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            CGWarpMouseCursorPosition(origin)
-            CGAssociateMouseAndMouseCursorPosition(1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.postMouseMove(to: origin)
         }
 
         direction *= -1
@@ -293,17 +326,37 @@ final class MouseManager: ObservableObject {
             let dx = CGFloat.random(in: -45...45)
             let dy = CGFloat.random(in: -45...45)
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard self != nil else { return }
-                CGWarpMouseCursorPosition(CGPoint(x: origin.x + dx, y: origin.y + dy))
-                CGAssociateMouseAndMouseCursorPosition(1)
+                self?.postMouseMove(to: CGPoint(x: origin.x + dx, y: origin.y + dy))
             }
         }
 
         // Snap back to origin after the burst.
-        DispatchQueue.main.asyncAfter(deadline: .now() + elapsed + 0.05) {
-            CGWarpMouseCursorPosition(origin)
-            CGAssociateMouseAndMouseCursorPosition(1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + elapsed + 0.05) { [weak self] in
+            self?.postMouseMove(to: origin)
         }
+    }
+
+    /// Posts a real mouse-moved event, as if from hardware. Unlike
+    /// `CGWarpMouseCursorPosition`, this resets the system idle timer, so
+    /// presence-tracking apps (Teams, Slack) see the Mac as active.
+    /// Requires Accessibility permission; without it the event is dropped.
+    private func postMouseMove(to point: CGPoint) {
+        userIdleAtLastSyntheticEvent = currentIdleSeconds()
+        lastSyntheticEventAt = Date()
+        CGEvent(
+            mouseEventSource: nil,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        )?.post(tap: .cghidEventTap)
+    }
+
+    // MARK: - Accessibility
+
+    /// Shows the system "allow Accessibility" prompt the first time.
+    private func requestAccessibilityIfNeeded() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        hasAccessibility = AXIsProcessTrustedWithOptions(options)
     }
 
     // MARK: - Power management

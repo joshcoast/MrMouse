@@ -40,7 +40,7 @@ xattr -dr com.apple.quarantine /Applications/MrMouse.app
 | **Only when idle** | Optional: wait until you've been inactive for 1–15 min before jiggling; pause the moment you come back |
 | **Dual sleep prevention** | Moves the cursor **and** holds an `IOPMAssertion` (no display sleep) |
 | **Persisted preferences** | Last-used interval and Wild Wiggle state survive restarts via `UserDefaults` |
-| **Zero permissions needed** | Uses `CGWarpMouseCursorPosition` — no Accessibility access required |
+| **Keeps Teams green** | Posts real mouse events so presence apps see activity (needs Accessibility access) |
 
 ---
 
@@ -96,10 +96,17 @@ The menu bar icons are template SVGs in `Assets.xcassets/MenuBarMouse*`.
 ```
 Timer fires every N seconds
   └─ CGEvent(source:nil).location   — read current cursor position
-  └─ CGWarpMouseCursorPosition()    — nudge ±1 px (alternating direction)
-  └─ 50 ms later: warp back to origin
-  └─ CGAssociateMouseAndMouseCursorPosition(1)  — re-lock hardware input
+  └─ post a mouseMoved CGEvent      — nudge ±1 px (alternating direction)
+  └─ 50 ms later: post another to move back to origin
 ```
+
+The moves are posted as real mouse events (`CGEvent.post(tap: .cghidEventTap)`)
+rather than cursor warps, because only real events reset the system idle timer
+that Teams and similar apps use for presence. That needs Accessibility
+permission: macOS prompts on first launch, and the menu shows a warning with a
+shortcut to System Settings until it's granted. Since the app is ad-hoc signed,
+macOS may forget the permission after a rebuild; remove and re-add MrMouse in
+the Accessibility list if the warning comes back.
 
 **Wild Wiggle mode** — erratic movement that looks like a real user:
 
@@ -124,7 +131,7 @@ MrMouse/
 │   └── project.pbxproj
 ├── MrMouse/
 │   ├── MrMouseApp.swift    — @main SwiftUI App + MenuBarExtra
-│   ├── MouseManager.swift  — ObservableObject: timer, cursor warp, IOPM, Wild Wiggle
+│   ├── MouseManager.swift  — ObservableObject: timer, posted mouse events, IOPM, Wild Wiggle
 │   ├── MenuView.swift      — SwiftUI menu content
 │   ├── Info.plist          — LSUIElement = YES (no Dock icon)
 │   ├── AppIcon.icon/       — Icon Composer app icon
